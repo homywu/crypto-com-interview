@@ -1,10 +1,15 @@
+/* eslint-disable max-classes-per-file */
 import * as sjcl from 'sjcl';
+import { closest } from 'fastest-levenshtein';
+import * as bip39 from 'bip39';
+import * as bip32 from 'bip32';
 import { wordListEnglish } from './english-word-list';
 
 export class Mnemonic {
   static toMnemonic(byteArray: Uint8Array) {
     if (byteArray.length % 4 > 0) {
-      throw 'Data length in bits should be divisible by 32, but it is not (' + byteArray.length + ' bytes = ' + byteArray.length * 8 + ' bits).'
+      throw new Error('Data length in bits should be divisible by 32, but it is not '
+        + `(${byteArray.length} bytes = ${byteArray.length * 8} bits).`);
     }
     const data = Mnemonic.byteArrayToWordArray(byteArray);
 
@@ -27,19 +32,67 @@ export class Mnemonic {
 
   static toEntropy(byteArray: Uint8Array) {
     let s = '';
-    for (var i = 0; i < byteArray.length; i++) {
-      var h = byteArray[i].toString(16);
+    for (let i = 0; i < byteArray.length; i++) {
+      let h = byteArray[i].toString(16);
       while (h.length < 2) {
-        h = '0' + h;
+        h = `0${h}`;
       }
-      s = s + h;
+      s += h;
     }
     return s;
   }
 
+  static toSeed(phrase: string, passphrase = '') {
+    return bip39.mnemonicToSeedSync(phrase, passphrase);
+  }
+
+  static toBip32RootKey(seed: Buffer) {
+    return bip32.fromSeed(seed);
+  }
+
+  static getDerivationPath(
+    purpose = 44, coin = 0,
+    account = 0, change = 0,
+  ) {
+    return `m/${purpose}'/${coin}'/${account}'/${change}`;
+  }
+
+  static getBip44DerivationPath(
+    purpose = 44, coin = 0,
+    account = 0,
+  ) {
+    return `m/${purpose}'/${coin}'/${account}'`;
+  }
+
+  static getBip32ExtendedKey(derivationPath: string, rootKey: bip32.BIP32Interface) {
+    if (!rootKey) {
+      throw new Error('A root key is required.');
+    }
+    let extendedKey: bip32.BIP32Interface | undefined = rootKey;
+
+    const pathBits = derivationPath.split('/');
+    for (const bit of pathBits) {
+      const idx = Number(bit.replaceAll('\'', ''));
+      if (isNaN(idx)) {
+        continue;
+      }
+      const hardened = bit[bit.length - 1] === '\'';
+      const isPrivate = !extendedKey?.isNeutered();
+      const invalidPath = hardened && !isPrivate;
+      if (invalidPath) {
+        extendedKey = undefined;
+      } else if (hardened) {
+        extendedKey = extendedKey?.deriveHardened(idx);
+      } else {
+        extendedKey = extendedKey?.derive(idx);
+      }
+    }
+    return extendedKey
+  }
+
   static byteArrayToWordArray(data: Uint8Array) {
-    var wordArray = [];
-    for (var i = 0; i < data.length / 4; i++) {
+    const wordArray = [];
+    for (let i = 0; i < data.length / 4; i++) {
       let v = 0;
       v += data[i * 4 + 0] << 8 * 3;
       v += data[i * 4 + 1] << 8 * 2;
@@ -51,8 +104,8 @@ export class Mnemonic {
   }
 
   static byteArrayToBinaryString(data: Uint8Array) {
-    var bin = '';
-    for (var i = 0; i < data.length; i++) {
+    let bin = '';
+    for (let i = 0; i < data.length; i++) {
       bin += Mnemonic.zfill(data[i].toString(2), 8);
     }
     return bin;
@@ -60,17 +113,88 @@ export class Mnemonic {
 
   static hexStringToBinaryString(hex: string) {
     let binaryString = '';
-    for (var i = 0; i < hex.length; i++) {
+    for (let i = 0; i < hex.length; i++) {
       binaryString += Mnemonic.zfill(parseInt(hex[i], 16).toString(2), 4);
     }
     return binaryString;
   }
 
+  static binaryStringToWordArray(binaryStr: string) {
+    const binaryLen = binaryStr.length / 32;
+    const binaryArray = [];
+    for (let i = 0; i < binaryLen; i++) {
+      const valueStr = binaryStr.substring(0, 32);
+      const value = parseInt(valueStr, 2);
+      binaryArray.push(value);
+      binaryStr = binaryStr.slice(32);
+    }
+    return binaryArray;
+  }
+
   static zfill(source: string, length: number) {
     source = source.toString();
     while (source.length < length) {
-      source = '0' + source;
+      source = `0${source}`;
     }
     return source;
   }
+
+  static validatePhrase(joinedWords: string) {
+    // Preprocess the joinedWords
+    joinedWords = joinedWords.normalize('NFKD');
+    const splitWords = joinedWords.split(' ');
+    // Detect blank phrase
+    if (splitWords.length === 0) {
+      return 'Blank mnemonic';
+    }
+
+    // Check words, if invalid return potential words
+    for (const word of splitWords) {
+      if (wordListEnglish.indexOf(word) === -1) {
+        console.log(`Finding closest match to ${word}`);
+        const nearestWord = closest(word, wordListEnglish);
+        throw new Error(`${word} not in wordlist, did you mean ${nearestWord}?`);
+      }
+    }
+
+    // Check the wordsArray are valid, a specific handle for japanese in real world, the japanese delimiter should be \u3000
+    if (splitWords.length === 0 || splitWords.length % 3 > 0) {
+      throw new Error(`the number of words in mnemonic is invalid, check here [${joinedWords}].`);
+    }
+
+    // revert the generate process to validate
+    const binaryStrArray: string[] = [];
+    for (const word of splitWords) {
+      const wordIdx = wordListEnglish.indexOf(word);
+      if (wordIdx === -1) {
+        throw new Error(`the word [${word}] is not in the word list`);
+      }
+      const binaryStr = Mnemonic.zfill(wordIdx.toString(2), 11);
+      binaryStrArray.push(binaryStr);
+    }
+
+    const joinedBinary = binaryStrArray.join('');
+    const binaryLength = joinedBinary.length;
+    const binaryStr = joinedBinary.substring(0, binaryLength / 33 * 32);
+    const binaryChecksumStr = joinedBinary.substring(binaryLength - binaryLength / 33, binaryLength);
+    const binaryArray = Mnemonic.binaryStringToWordArray(binaryStr);
+    const hashedBinary = sjcl.hash.sha256.hash(binaryArray);
+    const hexBinary = sjcl.codec.hex.fromBits(hashedBinary);
+    const ndBstr = Mnemonic.zfill(Mnemonic.hexStringToBinaryString(hexBinary), 256);
+    const nh = ndBstr.substring(0, binaryLength / 33);
+
+    if (binaryChecksumStr !== nh) {
+      throw new Error(`the mnemonic is invalid, binaryChecksumStr [${binaryChecksumStr}], nh [${nh}]`);
+    }
+  }
+
+  static validateDerivationPath(derivationPath: string, rootKey?: bip32.BIP32Interface) {
+    if (!rootKey) {
+      throw new Error('root key cannot be empty.');
+    }
+    if (derivationPath.includes('\'') && rootKey.isNeutered()) {
+      throw new Error('Hardened derivation path is invalid with xpub key');
+    }
+  }
+
 }

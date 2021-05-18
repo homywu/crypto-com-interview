@@ -2,13 +2,15 @@ import React, { useState } from 'react';
 import {
   Box, Container, Typography, Avatar,
   Grid, Paper, IconButton,
-  InputBase, Divider, makeStyles, Select, MenuItem, Collapse
+  InputBase, Divider, makeStyles, Select,
+  MenuItem, Collapse, TextField, OutlinedInputProps
 } from '@material-ui/core';
 import * as _ from 'lodash';
 import { Close, LibraryBooks } from '@material-ui/icons';
 import { SelectInputProps } from '@material-ui/core/Select/SelectInput';
-import { Alert } from '@material-ui/lab';
+import { Alert, AlertTitle } from '@material-ui/lab';
 import { Mnemonic } from './libs/mnemonic';
+import { BIP32Interface } from 'bip32';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -49,7 +51,19 @@ export default function App() {
   const [alertContent, setAlertContent] = useState('');
   const [entropy, setEntropy] = useState('');
   const [words, setWords] = useState('');
-  // const []
+  const [seed, setSeed] = useState('');
+  const [rootKey, setRootKey] = useState<BIP32Interface>();
+  // only support bip44 for interview
+  const [purpose, setPurpose] = useState(44);
+  // only support bitcoin for interview
+  const [coin, setCoin] = useState(0);
+  const [account, setAccount] = useState(0);
+  const [change, setChange] = useState(0);
+  const [derivationPath, setDerivationPath] = useState('');
+  const [bip32PrivateKey, setBip32PrivateKey] = useState('');
+  const [bip32PublicKey, setBip32PublicKey] = useState('');
+  const [accountPrivateKey, setAccountPrivateKey] = useState('');
+  const [accountPublicKey, setAccountPublicKey] = useState('');
 
   const onNumbOfWordsChange: SelectInputProps['onChange'] = (e) => {
     if (_.isNumber(e.target.value)) {
@@ -57,19 +71,77 @@ export default function App() {
     }
   };
 
+  const onWordsChange: OutlinedInputProps['onChange'] = (e) => {
+    setWords(e.target.value);
+  };
+
   const onGenerateClicked = () => {
-    if (!window.crypto) {
-      setAlertContent('The current browser does not support strong randomness.');
+    try {
+      if (!window.crypto) {
+        throw new Error('The current browser does not support strong randomness.');
+      }
+      const generatedInfo = generate(numbOfWords);
+      setWords(generatedInfo.words);
+      setEntropy(generatedInfo.entropy);
+      Mnemonic.validatePhrase(generatedInfo.words);
+      const bufSeed = Mnemonic.toSeed(generatedInfo.words);
+      setSeed(bufSeed.toString('hex'));
+      const bip32RootKey = Mnemonic.toBip32RootKey(bufSeed);
+      setRootKey(bip32RootKey);
+      calcDerivationPath(bip32RootKey);
+    } catch (error) {
+      setAlertContent(error.message);
     }
-    const generatedInfo = generate(numbOfWords);
-    setWords(generatedInfo.words);
-    setEntropy(generatedInfo.entropy)
+  };
+
+  const calcDerivationPath = (bip32RootKey: BIP32Interface) => {
+    try {
+      setDerivationPath(Mnemonic.getDerivationPath(purpose, coin, account, change));
+      const accountDerivationPath = Mnemonic.getBip44DerivationPath(purpose, coin, account);
+      Mnemonic.validateDerivationPath(derivationPath, bip32RootKey);
+      calcBip32ExtendedKey(derivationPath, bip32RootKey);
+      calcAccountExtendedKey(accountDerivationPath, bip32RootKey);
+    } catch (error) {
+      setAlertContent(error.message);
+    }
+  };
+
+  const calcBip32ExtendedKey = (derivationPath: string, bip32RootKey: BIP32Interface) => {
+    const extendedKey = Mnemonic.getBip32ExtendedKey(derivationPath, bip32RootKey);
+    setBip32PrivateKey(extendedKey?.toBase58() || '');
+    setBip32PublicKey(extendedKey?.neutered().toBase58() || '')
+  };
+
+  const calcAccountExtendedKey = (derivationPath: string, bip32RootKey: BIP32Interface) => {
+    const extendedKey = Mnemonic.getBip32ExtendedKey(derivationPath, bip32RootKey);
+    setAccountPrivateKey(extendedKey?.toBase58() || '');
+    setAccountPublicKey(extendedKey?.neutered().toBase58() || '')
   };
 
   return (
     <Container maxWidth="md">
       <Box my={10}>
         <Grid container spacing={3}>
+          <Grid item xs={12} sm={12}>
+            <Collapse in={!!alertContent}>
+              <Alert
+                severity="error"
+                action={
+                  <IconButton
+                    aria-label="close" color="inherit"
+                    size="small" onClick={() => {
+                      setAlertContent('');
+                    }}
+                  >
+                    <Close fontSize="inherit" />
+                  </IconButton>
+                }
+              >
+                <AlertTitle>Error</AlertTitle>
+                {alertContent}
+              </Alert>
+            </Collapse>
+          </Grid>
           <Grid item xs={12} sm={12}>
             <Typography variant="h4" component="h1" gutterBottom style={{
               display: 'flex',
@@ -107,32 +179,132 @@ export default function App() {
                 <LibraryBooks />
               </IconButton>
             </Paper>
-            <Collapse in={!!alertContent}>
-              <Alert
-                action={
-                  <IconButton
-                    aria-label="close" color="inherit"
-                    size="small" onClick={() => {
-                      setAlertContent('');
-                    }}
-                  >
-                    <Close fontSize="inherit" />
-                  </IconButton>
-                }
-              >
-                {alertContent}
-              </Alert>
-            </Collapse>
           </Grid>
           <Grid item xs={12} sm={12}>
-            <Paper component="form" className={classes.root}>
-              <InputBase
-                className={classes.input}
-                placeholder="BIP39 Mnemonic (Phrase)"
-                inputProps={{ 'aria-label': 'entropy' }}
-                value={words}
-              />
-            </Paper>
+            <TextField
+              id="phrase"
+              label="BIP39 Mnemonic (Phrase)"
+              multiline
+              rows={4}
+              value={words}
+              onChange={onWordsChange}
+              fullWidth
+              variant="outlined"
+            />
+          </Grid>
+          <Grid item xs={12} sm={12}>
+            <TextField
+              id="seed"
+              label="BIP39 Seed"
+              multiline
+              rows={4}
+              value={seed}
+              fullWidth
+              variant="outlined"
+            />
+          </Grid>
+          <Grid item xs={12} sm={12}>
+            <TextField
+              id="bip32rootkey"
+              label="BIP32 Root Key"
+              multiline
+              rows={4}
+              value={rootKey?.toBase58()}
+              fullWidth
+              variant="outlined"
+            />
+          </Grid>
+          <Grid item xs={3}>
+            <TextField
+              id="purpose"
+              label="Purpose"
+              value={purpose}
+              disabled
+              variant="outlined"
+            />
+          </Grid>
+          <Grid item xs={3}>
+            <TextField
+              id="coin"
+              label="Coin"
+              value={coin}
+              disabled
+              variant="outlined"
+            />
+          </Grid>
+          <Grid item xs={3}>
+            <TextField
+              id="account"
+              label="Account"
+              value={account}
+              variant="outlined"
+            />
+          </Grid>
+          <Grid item xs={3}>
+            <TextField
+              id="change"
+              label="External / Internal Change"
+              value={change}
+              variant="outlined"
+            />
+          </Grid>
+          <Grid item xs={12} sm={12}>
+            <TextField
+              id="derivationPath"
+              label="Derivation Path"
+              disabled
+              value={derivationPath}
+              fullWidth
+              variant="outlined"
+            />
+          </Grid>
+          <Grid item xs={12} sm={12}>
+            <TextField
+              id="bip32PrivateKey"
+              label="BIP32 Extended Private Key"
+              disabled
+              multiline
+              rows={4}
+              value={bip32PrivateKey}
+              fullWidth
+              variant="outlined"
+            />
+          </Grid>
+          <Grid item xs={12} sm={12}>
+            <TextField
+              id="bip32PublicKey"
+              label="BIP32 Extended Public Key"
+              disabled
+              multiline
+              rows={4}
+              value={bip32PublicKey}
+              fullWidth
+              variant="outlined"
+            />
+          </Grid>
+          <Grid item xs={12} sm={12}>
+            <TextField
+              id="privateKey"
+              label="Account Extended Private Key"
+              disabled
+              multiline
+              rows={4}
+              value={accountPrivateKey}
+              fullWidth
+              variant="outlined"
+            />
+          </Grid>
+          <Grid item xs={12} sm={12}>
+            <TextField
+              id="publicKey"
+              label="Account Extended Public Key"
+              disabled
+              multiline
+              rows={4}
+              value={accountPublicKey}
+              fullWidth
+              variant="outlined"
+            />
           </Grid>
         </Grid>
       </Box>
