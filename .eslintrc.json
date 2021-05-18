@@ -4,7 +4,6 @@
     "@typescript-eslint"
   ],
   "extends": [
-    "airbnb-typescript",
     "react-app"
   ],
   "settings": {
@@ -14,10 +13,16 @@
       }
     }
   },
+  "parserOptions": {
+    "project": [
+      "./tsconfig.json"
+    ]
+  },
   "rules": {
     "quotes": [
       2,
       "single"
-    ]
+    ],
+    "import/prefer-default-export": "off"
   }
 }
