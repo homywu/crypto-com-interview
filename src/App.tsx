@@ -224,7 +224,7 @@ export default function App() {
               label="BIP32 Root Key"
               multiline
               rows={4}
-              value={rootKey}
+              value={rootKey?.toBase58()}
               fullWidth
               variant="outlined"
             />
