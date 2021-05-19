@@ -1,10 +1,13 @@
 /* eslint-disable max-classes-per-file */
-import * as sjcl from 'sjcl';
+import { hash, codec } from 'sjcl';
 import { closest } from 'fastest-levenshtein';
-import * as bip39 from 'bip39';
-import * as bip32 from 'bip32';
+import { payments } from 'bitcoinjs-lib';
+import { mnemonicToSeedSync } from 'bip39';
+import { BIP32Interface, fromSeed } from 'bip32';
+
 import { wordListEnglish } from './english-word-list';
 
+// TODO: multisig
 export class Mnemonic {
   static toMnemonic(byteArray: Uint8Array) {
     if (byteArray.length % 4 > 0) {
@@ -13,8 +16,8 @@ export class Mnemonic {
     }
     const data = Mnemonic.byteArrayToWordArray(byteArray);
 
-    const hash = sjcl.hash.sha256.hash(data);
-    const hex = sjcl.codec.hex.fromBits(hash);
+    const hashedData = hash.sha256.hash(data);
+    const hex = codec.hex.fromBits(hashedData);
 
     const binaryString = Mnemonic.byteArrayToBinaryString(byteArray);
     const c = Mnemonic.zfill(Mnemonic.hexStringToBinaryString(hex), 256);
@@ -43,11 +46,11 @@ export class Mnemonic {
   }
 
   static toSeed(phrase: string, passphrase = '') {
-    return bip39.mnemonicToSeedSync(phrase, passphrase);
+    return mnemonicToSeedSync(phrase, passphrase);
   }
 
   static toBip32RootKey(seed: Buffer) {
-    return bip32.fromSeed(seed);
+    return fromSeed(seed);
   }
 
   static getDerivationPath(
@@ -64,11 +67,12 @@ export class Mnemonic {
     return `m/${purpose}'/${coin}'/${account}'`;
   }
 
-  static getBip32ExtendedKey(derivationPath: string, rootKey: bip32.BIP32Interface) {
+  // it can be replaced by bitcoin derivatePath
+  static getBip32ExtendedKey(derivationPath: string, rootKey: BIP32Interface) {
     if (!rootKey) {
       throw new Error('A root key is required.');
     }
-    let extendedKey: bip32.BIP32Interface | undefined = rootKey;
+    let extendedKey: BIP32Interface | undefined = rootKey;
 
     const pathBits = derivationPath.split('/');
     for (const bit of pathBits) {
@@ -87,18 +91,24 @@ export class Mnemonic {
         extendedKey = extendedKey?.derive(idx);
       }
     }
-    return extendedKey
+    return extendedKey;
+  }
+
+  static getPaymentAddress(index: number, derivationPath: string, rootKey: BIP32Interface) {
+    const addressDerivationPath = derivationPath + `/${index}`;
+    const extendedKey = Mnemonic.getBip32ExtendedKey(addressDerivationPath, rootKey);
+    return { payment: payments.p2pkh({ pubkey: extendedKey?.publicKey }), extendedKey };
   }
 
   static byteArrayToWordArray(data: Uint8Array) {
     const wordArray = [];
     for (let i = 0; i < data.length / 4; i++) {
-      let v = 0;
-      v += data[i * 4 + 0] << 8 * 3;
-      v += data[i * 4 + 1] << 8 * 2;
-      v += data[i * 4 + 2] << 8 * 1;
-      v += data[i * 4 + 3] << 8 * 0;
-      wordArray.push(v);
+      let wordSlot = 0;
+      wordSlot += data[i * 4 + 0] << 8 * 3;
+      wordSlot += data[i * 4 + 1] << 8 * 2;
+      wordSlot += data[i * 4 + 2] << 8 * 1;
+      wordSlot += data[i * 4 + 3] << 8 * 0;
+      wordArray.push(wordSlot);
     }
     return wordArray;
   }
@@ -178,8 +188,8 @@ export class Mnemonic {
     const binaryStr = joinedBinary.substring(0, binaryLength / 33 * 32);
     const binaryChecksumStr = joinedBinary.substring(binaryLength - binaryLength / 33, binaryLength);
     const binaryArray = Mnemonic.binaryStringToWordArray(binaryStr);
-    const hashedBinary = sjcl.hash.sha256.hash(binaryArray);
-    const hexBinary = sjcl.codec.hex.fromBits(hashedBinary);
+    const hashedBinary = hash.sha256.hash(binaryArray);
+    const hexBinary = codec.hex.fromBits(hashedBinary);
     const ndBstr = Mnemonic.zfill(Mnemonic.hexStringToBinaryString(hexBinary), 256);
     const nh = ndBstr.substring(0, binaryLength / 33);
 
@@ -188,7 +198,7 @@ export class Mnemonic {
     }
   }
 
-  static validateDerivationPath(derivationPath: string, rootKey?: bip32.BIP32Interface) {
+  static validateDerivationPath(derivationPath: string, rootKey?: BIP32Interface) {
     if (!rootKey) {
       throw new Error('root key cannot be empty.');
     }
