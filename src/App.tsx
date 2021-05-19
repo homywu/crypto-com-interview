@@ -11,6 +11,7 @@ import { SelectInputProps } from '@material-ui/core/Select/SelectInput';
 import { Alert, AlertTitle } from '@material-ui/lab';
 import { Mnemonic } from './libs/mnemonic';
 import { BIP32Interface } from 'bip32';
+import { AddressList } from './pages/address-list';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -96,28 +97,33 @@ export default function App() {
 
   const calcDerivationPath = (bip32RootKey: BIP32Interface) => {
     try {
-      setDerivationPath(Mnemonic.getDerivationPath(purpose, coin, account, change));
+      const bip32DerivationPath = Mnemonic.getDerivationPath(purpose, coin, account, change);
+      setDerivationPath(bip32DerivationPath);
+
+      Mnemonic.validateDerivationPath(bip32DerivationPath, bip32RootKey);
+      calcBip32Keys(bip32DerivationPath, bip32RootKey);
+
       const accountDerivationPath = Mnemonic.getBip44DerivationPath(purpose, coin, account);
-      Mnemonic.validateDerivationPath(derivationPath, bip32RootKey);
-      calcBip32ExtendedKey(derivationPath, bip32RootKey);
-      calcAccountExtendedKey(accountDerivationPath, bip32RootKey);
+      calcAccountKeys(accountDerivationPath, bip32RootKey);
+
     } catch (error) {
       setAlertContent(error.message);
     }
   };
 
-  const calcBip32ExtendedKey = (derivationPath: string, bip32RootKey: BIP32Interface) => {
-    const extendedKey = Mnemonic.getBip32ExtendedKey(derivationPath, bip32RootKey);
-    setBip32PrivateKey(extendedKey?.toBase58() || '');
-    setBip32PublicKey(extendedKey?.neutered().toBase58() || '')
+  const calcBip32Keys = (derivationPath: string, bip32RootKey: BIP32Interface) => {
+    const bip32ExtendedKey = Mnemonic.getBip32ExtendedKey(derivationPath, bip32RootKey);
+    setBip32PrivateKey(bip32ExtendedKey?.toBase58() || '');
+    setBip32PublicKey(bip32ExtendedKey?.neutered().toBase58() || '');
   };
 
-  const calcAccountExtendedKey = (derivationPath: string, bip32RootKey: BIP32Interface) => {
-    const extendedKey = Mnemonic.getBip32ExtendedKey(derivationPath, bip32RootKey);
-    setAccountPrivateKey(extendedKey?.toBase58() || '');
-    setAccountPublicKey(extendedKey?.neutered().toBase58() || '')
+  const calcAccountKeys = (derivationPath: string, bip32RootKey: BIP32Interface) => {
+    const bip44ExtendedKey = Mnemonic.getBip32ExtendedKey(derivationPath, bip32RootKey);
+    setAccountPrivateKey(bip44ExtendedKey?.toBase58() || '');
+    setAccountPublicKey(bip44ExtendedKey?.neutered().toBase58() || '')
   };
 
+  // TODO: spit react components
   return (
     <Container maxWidth="md">
       <Box my={10}>
@@ -143,12 +149,21 @@ export default function App() {
             </Collapse>
           </Grid>
           <Grid item xs={12} sm={12}>
+            <Typography variant="h3" component="h1" gutterBottom style={{
+              display: 'flex',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+            }}>
+              <Avatar alt="Bitcoin" src="/images/bitcoin.png" />&nbsp;&nbsp;Bitcoin playground
+            </Typography>
+          </Grid>
+          <Grid item xs={12} sm={12}>
             <Typography variant="h4" component="h1" gutterBottom style={{
               display: 'flex',
               alignItems: 'center',
               flexWrap: 'wrap',
             }}>
-              <Avatar alt="Bitcoin" src="/images/bitcoin.png" /> Bitcoin playground
+              Mnemonic
             </Typography>
           </Grid>
           <Grid item xs={12}>
@@ -209,10 +224,22 @@ export default function App() {
               label="BIP32 Root Key"
               multiline
               rows={4}
-              value={rootKey?.toBase58()}
+              value={rootKey}
               fullWidth
               variant="outlined"
             />
+          </Grid>
+          <Grid item xs={12} sm={12}>
+            <Divider />
+          </Grid>
+          <Grid item xs={12} sm={12}>
+            <Typography variant="h4" component="h1" gutterBottom style={{
+              display: 'flex',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+            }}>
+              Derivation Path (BIP44)
+            </Typography>
           </Grid>
           <Grid item xs={3}>
             <TextField
@@ -304,6 +331,21 @@ export default function App() {
               value={accountPublicKey}
               fullWidth
               variant="outlined"
+            />
+          </Grid>
+          <Grid item xs={12} sm={12}>
+            <Typography variant="h4" component="h1" gutterBottom style={{
+              display: 'flex',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+            }}>
+              Derived Addresses
+            </Typography>
+          </Grid>
+          <Grid item xs={12} sm={12}>
+            <AddressList
+              bip32DerivationPath={derivationPath}
+              bip32RootKey={rootKey}
             />
           </Grid>
         </Grid>
