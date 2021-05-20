@@ -1,7 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Divider, Grid, IconButton, InputBase, makeStyles, MenuItem, OutlinedInputProps, Paper, Select, TextField, Typography } from '@material-ui/core';
 import { LibraryBooks } from '@material-ui/icons';
 import { SelectInputProps } from '@material-ui/core/Select/SelectInput';
+import { isNumber } from 'lodash';
+import { connect, useDispatch } from 'react-redux';
+import { mnemonicSlice } from '../stores/mnemonic-store';
+import { errorSlice } from '../stores/error-store';
+import { actionCreators, IMapState, mapState } from '../stores';
+import { handleNull } from '../libs/utils';
+import { derivationPathInfoSlice } from '../stores/derivation-path-store';
+import { Mnemonic } from '../libs/mnemonic';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -23,19 +31,64 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-interface IMnemonicProps {
-  entropy: string;
-  numbOfWords: string;
-  onNumbOfWordsChange: SelectInputProps['onChange'];
-  words: string[];
-  onWordsChange: OutlinedInputProps['onChange'];
-  onGenerateClicked: () => void;
-  seed: string;
-  rootKey: string;
-}
-
-export const Mnemonic = (props: IMnemonicProps) => {
+const _MnemonicSection = ({ mnemonicInfo }: IMapState) => {
   const classes = useStyles();
+  const [numbOfWords, setNumberOfWords] = useState(15);
+  const dispatch = useDispatch();
+
+  const onNumbOfWordsChange: SelectInputProps['onChange'] = (e) => {
+    if (isNumber(e.target.value)) {
+      setNumberOfWords(e.target.value);
+    }
+  };
+
+  const onWordsChange: OutlinedInputProps['onChange'] = (e) => {
+    // setWords(e.target.value);
+  };
+
+  const calcDerivationPath: OutlinedInputProps['onChange'] = (e) => {
+    if (!!e.target.value) {
+      dispatch(
+        derivationPathInfoSlice.actions.calcDerivationPath(
+          e.target.value),
+      );
+    }
+  };
+
+  const calcMnemonic = (numbOfWords: number) => {
+    if (!window.crypto) {
+      throw new Error('The current browser does not support strong randomness.');
+    }
+    const randomValues = Mnemonic.getRandomValues(numbOfWords);
+    const entropy = Mnemonic.toEntropy(randomValues);
+    const words = Mnemonic.toMnemonic(randomValues);
+    const bufSeed = Mnemonic.toSeed(words);
+    const bip32RootKey = Mnemonic.toBip32RootKey(bufSeed);
+    return {
+      numbOfWords,
+      entropy,
+      words,
+      seed: bufSeed.toString('hex'),
+      rootKey: bip32RootKey.toBase58(),
+    };
+  }
+
+  const onGenerateClicked = () => {
+    try {
+      if (!window.crypto) {
+        throw new Error('The current browser does not support strong randomness.');
+      }
+
+      const result = calcMnemonic(numbOfWords);
+      dispatch(mnemonicSlice.actions.setMnemonic(result));
+      dispatch(
+        derivationPathInfoSlice.actions.calcDerivationPath(result.rootKey),
+      );
+    } catch (error) {
+      dispatch(errorSlice.actions.setError(error));
+    }
+  };
+
   return (<>
     <Grid item xs={12} sm={12}>
       <Typography variant='h4' component='h1' gutterBottom style={{
@@ -52,13 +105,13 @@ export const Mnemonic = (props: IMnemonicProps) => {
           className={classes.input}
           placeholder='Entropy'
           inputProps={{ 'aria-label': 'entropy' }}
-          value={props.entropy}
+          value={handleNull(mnemonicInfo?.entropy)}
         />
         <Select
           labelId='numbOfWords'
           id='numbOfWords'
-          value={props.numbOfWords}
-          onChange={props.onNumbOfWordsChange}
+          value={mnemonicInfo?.numbOfWords}
+          onChange={onNumbOfWordsChange}
         >
           <MenuItem value={3}>3 words</MenuItem>
           <MenuItem value={6}>6 words</MenuItem>
@@ -70,7 +123,7 @@ export const Mnemonic = (props: IMnemonicProps) => {
           <MenuItem value={24}>24 words</MenuItem>
         </Select>
         <Divider className={classes.divider} orientation='vertical' />
-        <IconButton className={classes.iconButton} aria-label='search' onClick={props.onGenerateClicked}>
+        <IconButton className={classes.iconButton} aria-label='search' onClick={onGenerateClicked}>
           <LibraryBooks />
         </IconButton>
       </Paper>
@@ -81,8 +134,8 @@ export const Mnemonic = (props: IMnemonicProps) => {
         label='BIP39 Mnemonic (Phrase)'
         multiline
         rows={4}
-        value={props.words}
-        onChange={props.onWordsChange}
+        value={handleNull(mnemonicInfo?.words)}
+        onChange={onWordsChange}
         fullWidth
         variant='outlined'
       />
@@ -93,7 +146,7 @@ export const Mnemonic = (props: IMnemonicProps) => {
         label='BIP39 Seed'
         multiline
         rows={4}
-        value={props.seed}
+        value={handleNull(mnemonicInfo?.seed)}
         fullWidth
         variant='outlined'
       />
@@ -104,10 +157,16 @@ export const Mnemonic = (props: IMnemonicProps) => {
         label='BIP32 Root Key'
         multiline
         rows={4}
-        value={props.rootKey}
+        value={handleNull(mnemonicInfo?.rootKey)}
+        onChange={calcDerivationPath}
         fullWidth
         variant='outlined'
       />
     </Grid>
   </>);
 }
+
+export const MnemonicSection = connect(
+  mapState,
+  actionCreators
+)(_MnemonicSection);
