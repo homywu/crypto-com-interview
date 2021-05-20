@@ -1,7 +1,8 @@
 import * as React from 'react';
 import { Mnemonic } from '../libs/mnemonic';
-import { BIP32Interface } from 'bip32';
 import { DataGrid, GridColDef } from '@material-ui/data-grid';
+import { actionCreators, IMapState, mapState } from '../stores';
+import { connect } from 'react-redux';
 
 // Infinity scroll is supported in XGrid enterprise version,
 // So I set maximum 500 rows for now.
@@ -15,13 +16,14 @@ export interface IDerivedAddress {
   privateKey?: string;
 }
 
-const calcDerivedAddress = (index: number, length: number, bip32DerivationPath: string, bip32RootKey?: BIP32Interface) => {
+const calcDerivedAddress = (index: number, length: number, bip32DerivationPath?: string, bip32RootKey?: string) => {
   const addresses: IDerivedAddress[] = [];
+  if (!bip32DerivationPath || !bip32RootKey) {
+    return [];
+  }
+  const rootKey = Mnemonic.stringToBip32RootKey(bip32RootKey);
   for (let i = index; i < length + index; i++) {
-    if (!bip32RootKey) {
-      return [];
-    }
-    const { payment, extendedKey } = Mnemonic.getPaymentAddress(i, bip32DerivationPath, bip32RootKey);
+    const { payment, extendedKey } = Mnemonic.getPaymentAddress(i, bip32DerivationPath, rootKey);
     const path = bip32DerivationPath + `/${i}`;
     const addressObject: IDerivedAddress = {
       path,
@@ -36,7 +38,7 @@ const calcDerivedAddress = (index: number, length: number, bip32DerivationPath: 
   return addresses;
 };
 
-export const AddressList = (props: { bip32DerivationPath: string, bip32RootKey?: BIP32Interface }) => {
+export const _AddressList = ({ derivationPathInfo, mnemonicInfo }: IMapState) => {
   const columns: GridColDef[] = [{
     field: 'id',
     headerName: 'id',
@@ -64,9 +66,14 @@ export const AddressList = (props: { bip32DerivationPath: string, bip32RootKey?:
       <DataGrid
         pagination
         columns={columns}
-        rows={calcDerivedAddress(0, MAX_ROW_LENGTH, props.bip32DerivationPath, props.bip32RootKey)}
+        rows={calcDerivedAddress(0, MAX_ROW_LENGTH, derivationPathInfo?.derivationPath, mnemonicInfo?.rootKey)}
         pageSize={20}
       />
     </div>
   );
 }
+
+export const AddressList = connect(
+  mapState,
+  actionCreators
+)(_AddressList);

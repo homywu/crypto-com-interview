@@ -4,7 +4,8 @@
     "@typescript-eslint"
   ],
   "extends": [
-    "react-app"
+    "react-app",
+    "plugin:@typescript-eslint/recommended"
   ],
   "settings": {
     "import/resolver": {
@@ -23,6 +24,7 @@
       2,
       "single"
     ],
-    "import/prefer-default-export": "off"
+    "import/prefer-default-export": "off",
+    "@typescript-eslint/explicit-module-boundary-types": "off"
   }
 }
