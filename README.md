@@ -14,6 +14,25 @@ The site deployed to [AWS S3 + CloudFront](https://d1p37yk9w71ory.cloudfront.net
 **react-js** - A UI library
 **redux-toolkit** - Redux state management for react, redux toolkit is a set of tools which maintains the states better.
 
+## What I learnt from this exercise?
+
+The exercise was trying to use a single secret to create any amount of key pairs for transaction. so the steps as follows:
+
+* Generate an entropy (128 / 256 bits)
+* Convert entropy to seed and also the recover phrase (the words combination) - Proposed in BIP39
+* Convert the seed to HDWallet, HDWallet to generate the individual keys
+* Use the keys to convert to addresses (Propose in BIP32 / BIP44)
+
+The features are implemented in the current codebase.
+
+## (Bonus) multi-sig
+
+Apologies for not implement the bonus feature with the limited time, what I learn from the feature is that, without multi-sig, people can use a single key to corresponds with the address, or if you lost the key, you will never get the coins back.
+
+In order to improve the security and prevent a single key lost, P2SH allows multi keys associates with the multisig address, and you need at least n of m keys in order to move the coins.
+
+In bitcoinjs lib, [multi-sig](https://github.com/bitcoinjs/bitcoinjs-lib/blob/239711bf4ef00651af92049bcdf88b12252b945c/test/integration/addresses.spec.ts#L73) has been implemented for my reference.
+
 ## Is it safe for users to use?
 
 The library is completely runnable without network, doesn't save data in cookies or any tmp storages
