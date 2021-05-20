@@ -3,12 +3,19 @@ import { hash, codec } from 'sjcl';
 import { closest } from 'fastest-levenshtein';
 import { payments } from 'bitcoinjs-lib';
 import { mnemonicToSeedSync } from 'bip39';
-import { BIP32Interface, fromSeed } from 'bip32';
+import { BIP32Interface, fromBase58, fromSeed } from 'bip32';
 
 import { wordListEnglish } from './english-word-list';
 
 // TODO: multisig
 export class Mnemonic {
+  static getRandomValues(numbOfWords: number) {
+    const strength = numbOfWords / 3 * 32;
+    const buffer = new Uint8Array(strength / 8);
+
+    return crypto.getRandomValues(buffer);
+  }
+
   static toMnemonic(byteArray: Uint8Array) {
     if (byteArray.length % 4 > 0) {
       throw new Error('Data length in bits should be divisible by 32, but it is not '
@@ -51,6 +58,10 @@ export class Mnemonic {
 
   static toBip32RootKey(seed: Buffer) {
     return fromSeed(seed);
+  }
+
+  static stringToBip32RootKey(strRootKey: string) {
+    return fromBase58(strRootKey);
   }
 
   static getDerivationPath(
