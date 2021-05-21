@@ -1,5 +1,3 @@
-import React from 'react';
-import { render, screen } from '@testing-library/react';
 import { Mnemonic } from './mnemonic';
 import { randomBytes } from 'crypto';
 import { mnemonicFixtures } from '../test/mnemonic.fixtures';
