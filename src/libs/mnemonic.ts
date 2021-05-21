@@ -9,11 +9,14 @@ import { wordListEnglish } from './english-word-list';
 
 // TODO: multisig
 export class Mnemonic {
-  static getRandomValues(numbOfWords: number) {
+  static getRandomValues(
+    numbOfWords: number,
+    getRandomValues: (array: Uint8Array) => Uint8Array,
+  ) {
     const strength = numbOfWords / 3 * 32;
     const buffer = new Uint8Array(strength / 8);
 
-    return crypto.getRandomValues(buffer);
+    return getRandomValues(buffer);
   }
 
   static toMnemonic(byteArray: Uint8Array) {
