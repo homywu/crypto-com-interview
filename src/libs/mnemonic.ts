@@ -9,11 +9,14 @@ import { wordListEnglish } from './english-word-list';
 
 // TODO: multisig
 export class Mnemonic {
-  static getRandomValues(numbOfWords: number) {
+  static getRandomValues(
+    numbOfWords: number,
+    getRandomValues: (array: Uint8Array) => Uint8Array,
+  ) {
     const strength = numbOfWords / 3 * 32;
     const buffer = new Uint8Array(strength / 8);
 
-    return crypto.getRandomValues(buffer);
+    return getRandomValues(buffer);
   }
 
   static toMnemonic(byteArray: Uint8Array) {
@@ -79,7 +82,7 @@ export class Mnemonic {
   }
 
   // it can be replaced by bitcoin derivatePath
-  static getBip32ExtendedKey(derivationPath: string, rootKey: BIP32Interface) {
+  static getExtendedKey(derivationPath: string, rootKey: BIP32Interface) {
     if (!rootKey) {
       throw new Error('A root key is required.');
     }
@@ -87,7 +90,7 @@ export class Mnemonic {
 
     const pathBits = derivationPath.split('/');
     for (const bit of pathBits) {
-      const idx = Number(bit.replaceAll('\'', ''));
+      const idx = Number(bit.replace(/'/g, ''));
       if (isNaN(idx)) {
         continue;
       }
@@ -107,7 +110,7 @@ export class Mnemonic {
 
   static getPaymentAddress(index: number, derivationPath: string, rootKey: BIP32Interface) {
     const addressDerivationPath = derivationPath + `/${index}`;
-    const extendedKey = Mnemonic.getBip32ExtendedKey(addressDerivationPath, rootKey);
+    const extendedKey = Mnemonic.getExtendedKey(addressDerivationPath, rootKey);
     return { payment: payments.p2pkh({ pubkey: extendedKey?.publicKey }), extendedKey };
   }
 

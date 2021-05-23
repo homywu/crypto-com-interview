@@ -35,15 +35,15 @@ export const derivationPathInfoSlice = createSlice({
         state.account,
         state.change,
       );
-      const accountDerivationPath = Mnemonic.getBip44DerivationPath(
+      const bip44DerivationPath = Mnemonic.getBip44DerivationPath(
         state.purpose,
         state.coin,
         state.account,
       );
 
-      const bip32ExtendedKey = Mnemonic.getBip32ExtendedKey(bip32DerivationPath, bip32RootKey);
+      const bip32ExtendedKey = Mnemonic.getExtendedKey(bip32DerivationPath, bip32RootKey);
 
-      const bip44ExtendedKey = Mnemonic.getBip32ExtendedKey(accountDerivationPath, bip32RootKey);
+      const bip44ExtendedKey = Mnemonic.getExtendedKey(bip44DerivationPath, bip32RootKey);
 
       return {
         purpose: state.purpose,

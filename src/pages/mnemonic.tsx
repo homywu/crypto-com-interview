@@ -16,7 +16,6 @@ const useStyles = makeStyles((theme) => ({
     padding: '2px 4px',
     display: 'flex',
     alignItems: 'center',
-    width: 800,
   },
   input: {
     marginLeft: theme.spacing(1),
@@ -59,7 +58,9 @@ const _MnemonicSection = ({ mnemonicInfo }: IMapState) => {
     if (!window.crypto) {
       throw new Error('The current browser does not support strong randomness.');
     }
-    const randomValues = Mnemonic.getRandomValues(numbOfWords);
+    const randomValues = Mnemonic.getRandomValues(
+      numbOfWords, window.crypto.getRandomValues,
+    );
     const entropy = Mnemonic.toEntropy(randomValues);
     const words = Mnemonic.toMnemonic(randomValues);
     const bufSeed = Mnemonic.toSeed(words);

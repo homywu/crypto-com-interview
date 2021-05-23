@@ -43,7 +43,15 @@ Code implemented in Typescript which check code quality by eslint with typescrip
 
 ## Are there any test cases coverage?
 
-Apologies for not having tests as this moment, since I was focus on understand and build the code as good as I can, normally, I will separate the codes in libs folder to an npm package, and have the testing without mixin the front-end logics.
+```sh
+# Run all test
+yarn test
+
+# Check test coverage
+yarn coverage
+```
+
+Apologies for not having enough tests as this moment, since I was focus on understand and build the code as good as I can, normally, I will separate the codes in libs folder to an npm package, and have the testing without mixin the front-end logics.
 
 ## Available Scripts
 
