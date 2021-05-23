@@ -1,6 +1,6 @@
 import { Mnemonic } from './mnemonic';
 import { randomBytes } from 'crypto';
-import { mnemonicFixtures } from '../test/fixtures/mnemonic.fixtures';
+import { invalidFromBase58, invalidFromSeed, mnemonicFixtures } from '../test/fixtures/mnemonic.fixtures';
 import { fromBase58, fromSeed } from 'bip32';
 
 export const getRandomValues = (array: Uint8Array) => {
@@ -57,18 +57,61 @@ describe('Mnemonic', () => {
         expect(rootKey.toBase58()).toEqual(fixture.rootKey);
       });
     }
+
+    invalidFromSeed.forEach(o => {
+      it(`should throw proper exception for invalid seed ${o.seed}`, () => {
+        try {
+          Mnemonic.toBip32RootKey(Buffer.from(o.seed, 'hex'));
+        } catch (error) {
+          expect(error.message).toEqual(o.exception);
+        }
+      });
+    })
   });
 
   describe('getDerivationPath', () => {
-    it('should return the expectd derivation path', () => {
+    it('should return the expected derivation path', () => {
       expect(Mnemonic.getDerivationPath(32, 1, 0, 0)).toEqual('m/32\'/1\'/0\'/0');
     });
   });
 
-  describe('getDerivationPath', () => {
-    it('should return the expectd derivation path', () => {
+  describe('getBip44DerivationPath', () => {
+    it('should return the expected derivation path', () => {
       expect(Mnemonic.getBip44DerivationPath(32, 1, 0)).toEqual('m/32\'/1\'/0\'');
     });
   });
 
+  describe('stringToBip32RootKey', () => {
+    invalidFromBase58.forEach(o => {
+      it(`should throw proper exception for invalid base58 ${o.string}`, () => {
+        try {
+          Mnemonic.stringToBip32RootKey(o.string);
+        } catch (error) {
+          expect(error.message).toEqual(o.exception);
+        }
+      });
+    })
+  });
+
+  describe('getBip32ExtendedKey', () => {
+    it('should return the expected extended key', () => {
+      for (const fixture of mnemonicFixtures) {
+        const rootKey = fromBase58(fixture.rootKey);
+        const extendedKey = Mnemonic.getExtendedKey(fixture.path, rootKey);
+        const privateKey = extendedKey?.toBase58();
+        const publicKey = extendedKey?.neutered().toBase58();
+        expect(privateKey).toEqual(fixture.privateKey);
+        expect(publicKey).toEqual(fixture.publicKey);
+      }
+    });
+
+    it('should throw exception when rootKey is empty', () => {
+      expect(() => {
+        Mnemonic.getExtendedKey(
+          'm/0/2147483647\'/1/2147483646\'/2',
+          null as never,
+        )
+      }).toThrow('A root key is required.');
+    });
+  });
 });
