@@ -79,3 +79,6 @@ The build is minified and the filenames include the hashes.\
 Your app is ready to be deployed!
 
 See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+
+Monero
+42rn2KSjdpd817HiXzJQX3GuJm9ks2z8SPHrXSdrUvUp7wrPUzS1ykxannPgPiqpUZVdPNzc1WbHCKcsTueBsPFuB4HZhFT
