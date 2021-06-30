@@ -66,7 +66,7 @@ The page will reload if you make edits.\
 You will also see any lint errors in the console.
 
 ### `yarn test`
-
+he graduated from Singapore Management University with Master of Science in Applied Finance, and he strong at golang / node.js as well, please let me know if we try it or not, thanks!
 Launches the test runner in the interactive watch mode.\
 See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
 
